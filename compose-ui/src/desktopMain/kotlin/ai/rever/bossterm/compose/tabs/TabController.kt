@@ -97,7 +97,8 @@ class TabController(
     private val onLastTabClosed: () -> Unit,
     private val isWindowFocused: () -> Boolean = { true },
     private val onTabClose: ((tabId: String) -> Unit)? = null,
-    private val platformServices: PlatformServices = getPlatformServices()
+    private val platformServices: PlatformServices = getPlatformServices(),
+    private val parentScope: CoroutineScope? = null
 ) {
     /**
      * List of all terminal tabs (observable, triggers recomposition).
@@ -222,7 +223,7 @@ class TabController(
      * 2. Better lifecycle management than orphaned GlobalScope coroutines
      * 3. SupervisorJob prevents individual failures from cancelling siblings
      */
-    private val cleanupScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val cleanupScope = CoroutineScope(SupervisorJob(parentScope?.coroutineContext?.get(Job)) + Dispatchers.IO)
 
     /**
      * Raised when a new session is refused because [TerminalSessionSlots] is exhausted
@@ -578,7 +579,7 @@ class TabController(
         }
 
         // Create coroutine scope for type-ahead (will be shared with tab scope)
-        val tabCoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val tabCoroutineScope = CoroutineScope(SupervisorJob(parentScope?.coroutineContext?.get(Job)) + Dispatchers.Default)
 
         val typeAheadManager = typeAheadModel?.let { model ->
             TerminalTypeAheadManager(model).also { manager ->
@@ -736,7 +737,7 @@ class TabController(
         dataStream.onChunkStart = { textBuffer.beginBatch() }
         dataStream.onChunkEnd = { textBuffer.endBatch() }
         val emulator = BossEmulator(dataStream, terminal, settings.allowKittyFileTransfers)
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val scope = CoroutineScope(SupervisorJob(parentScope?.coroutineContext?.get(Job)) + Dispatchers.Default)
 
         val tab = TerminalTab(
             id = java.util.UUID.randomUUID().toString(),
@@ -949,7 +950,7 @@ class TabController(
         )
 
         // Create type-ahead model and manager if enabled
-        val tabCoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val tabCoroutineScope = CoroutineScope(SupervisorJob(parentScope?.coroutineContext?.get(Job)) + Dispatchers.Default)
 
         val typeAheadModel = if (settings.typeAheadEnabled) {
             ComposeTypeAheadModel(
@@ -1195,7 +1196,7 @@ class TabController(
             maxSnapshots = settings.debugMaxSnapshots
         )
 
-        val tabCoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val tabCoroutineScope = CoroutineScope(SupervisorJob(parentScope?.coroutineContext?.get(Job)) + Dispatchers.Default)
 
         // Create tab with Initializing state
         val tab = TerminalTab(

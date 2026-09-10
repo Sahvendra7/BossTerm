@@ -86,7 +86,9 @@ import kotlinx.coroutines.flow.StateFlow
  * })
  * ```
  */
-class TabbedTerminalState {
+class TabbedTerminalState(
+    val parentScope: CoroutineScope? = null
+) {
     internal var tabController: TabController? by mutableStateOf(null)
     private var initialized = false
 
@@ -190,11 +192,12 @@ class TabbedTerminalState {
             onLastTabClosed = onLastTabClosed,
             isWindowFocused = isWindowFocused,
             onTabClose = onTabClose,
-            platformServices = platformServices
+            platformServices = platformServices,
+            parentScope = parentScope
         )
 
         // Wire up snapshotFlow bridges for reactive state (T7)
-        flowScope = CoroutineScope(SupervisorJob() + Dispatchers.Main).also { scope ->
+        flowScope = CoroutineScope(SupervisorJob(parentScope?.coroutineContext?.get(kotlinx.coroutines.Job)) + Dispatchers.Main).also { scope ->
             scope.launch {
                 snapshotFlow { tabController?.tabs?.map { it.toTabInfo() } ?: emptyList() }
                     .collect { _tabsFlow.value = it }
